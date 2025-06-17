@@ -3,8 +3,18 @@ name: Main CI
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'pom.xml'
+      - 'ojp-grpc-commons/**'
+      - 'ojp-jdbc-driver/**'
+      - 'ojp-server/**'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'pom.xml'
+      - 'ojp-grpc-commons/**'
+      - 'ojp-jdbc-driver/**'
+      - 'ojp-server/**'
 
 jobs:
   build-test:
@@ -14,7 +24,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:17
         env:
           POSTGRES_USER: testuser
           POSTGRES_PASSWORD: testpassword
