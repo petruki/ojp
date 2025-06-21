@@ -10,8 +10,6 @@ on:
     branches: [ main ]
 
 jobs:
-  # Builds the server module and runs tests for the ojp-server.
-  # Starts the ojp-server in the background for the driver tests.
   build-test:
     name: Build & Test Server
     runs-on: ubuntu-latest
@@ -19,7 +17,6 @@ jobs:
     strategy:
       matrix:
         java-version: [ 11, 17, 21, 22 ]
-        module: [ ojp-jdbc-driver, ojp-grpc-commons ]
 
     services:
       postgres:
@@ -65,13 +62,12 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build ${{ matrix.module }}
-        run: mvn clean install -pl ${{ matrix.module }} -DskipTests
+      - name: Build
+        run: mvn clean install -DskipTests
 
-      - name: Test ${{ matrix.module }}
-        run: mvn test -pl ${{ matrix.module }}
+      - name: Tests
+        run: mvn test
 
-  # Builds and pushes a Docker image for the ojp-server if relevant files are modified.
   build-docker-image:
     name: Build Docker Image
     needs: build-test
