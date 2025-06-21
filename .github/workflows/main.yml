@@ -46,13 +46,13 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build ojp-server
+      - name: Build (ojp-server)
         run: mvn clean install -pl ojp-server -DskipTests
 
-      - name: Test ojp-server
+      - name: Test (ojp-server)
         run: mvn test -pl ojp-server
 
-      - name: Run ojp-server
+      - name: Run (ojp-server)
         run: mvn verify -pl ojp-server -Prun-ojp-server > ojp-server.log 2>&1 &
 
       - name: Set up JDK ${{ matrix.java-version }}
@@ -62,11 +62,11 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build
-        run: mvn clean install -DskipTests
+      - name: Build (ojp-grpc-commons, ojp-jdbc-driver)
+        run: mvn clean install -pl ojp-grpc-commons,ojp-jdbc-driver -DskipTests
 
-      - name: Tests
-        run: mvn test
+      - name: Test (ojp-grpc-commons, ojp-jdbc-driver)
+        run: mvn test -pl ojp-grpc-commons,ojp-jdbc-driver
 
   build-docker-image:
     name: Build Docker Image
