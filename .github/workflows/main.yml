@@ -12,10 +12,14 @@ on:
 jobs:
   # Builds the server module and runs tests for the ojp-server.
   # Starts the ojp-server in the background for the driver tests.
-  build-test-server:
+  build-test:
     name: Build & Test Server
     runs-on: ubuntu-latest
     if: "! contains(toJSON(github.event.commits.*.message), '[skip ci]')"
+    strategy:
+      matrix:
+        java-version: [ 11, 17, 21, 22 ]
+        module: [ ojp-jdbc-driver, ojp-grpc-commons ]
 
     services:
       postgres:
@@ -38,39 +42,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 22
+      - name: Set up JDK 22 for ojp-server
         uses: actions/setup-java@v4
         with:
           java-version: 22
           distribution: 'temurin'
           cache: maven
 
-      - name: Build
-        run: mvn clean install -DskipTests
+      - name: Build ojp-server
+        run: mvn clean install -pl ojp-server -DskipTests
 
-      - name: Run tests
-        run: mvn test -pl ojp-server -DdisablePostgresTests
+      - name: Test ojp-server
+        run: mvn test -pl ojp-server
 
       - name: Run ojp-server
         run: mvn verify -pl ojp-server -Prun-ojp-server > ojp-server.log 2>&1 &
-
-      - name: Wait for ojp-server to start
-        run: sleep 10
-
-  # Builds and tests the driver module against multiple Java versions.
-  build-test-driver:
-    name: Build & Test Driver
-    needs: build-test-server
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        java-version: [ 11, 17, 21, 22 ]
-
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v4
@@ -79,13 +65,16 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run tests
-        run: mvn test -pl ojp-grpc-commons,ojp-jdbc-driver
+      - name: Build ${{ matrix.module }}
+        run: mvn clean install -pl ${{ matrix.module }} -DskipTests
+
+      - name: Test ${{ matrix.module }}
+        run: mvn test -pl ${{ matrix.module }}
 
   # Builds and pushes a Docker image for the ojp-server if relevant files are modified.
   build-docker-image:
     name: Build Docker Image
-    needs: build-test-server
+    needs: build-test
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'push' && (
