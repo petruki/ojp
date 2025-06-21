@@ -10,8 +10,10 @@ on:
     branches: [ main ]
 
 jobs:
-  build-test:
-    name: Build & Test
+  # Builds the server module and runs tests for the ojp-server.
+  # Starts the ojp-server in the background for the driver tests.
+  build-test-server:
+    name: Build & Test Server
     runs-on: ubuntu-latest
     if: "! contains(toJSON(github.event.commits.*.message), '[skip ci]')"
 
@@ -46,8 +48,70 @@ jobs:
       - name: Build
         run: mvn clean install -DskipTests
 
+      - name: Run tests
+        run: mvn test -pl ojp-server -DdisablePostgresTests
+
       - name: Run ojp-server
         run: mvn verify -pl ojp-server -Prun-ojp-server > ojp-server.log 2>&1 &
 
+      - name: Wait for ojp-server to start
+        run: sleep 10
+
+  # Builds and tests the driver module against multiple Java versions.
+  build-test-driver:
+    name: Build & Test Driver
+    needs: build-test-server
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: [ 11, 17, 21, 22 ]
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          cache: maven
+
       - name: Run tests
-        run: mvn test
+        run: mvn test -pl ojp-grpc-commons,ojp-jdbc-driver
+
+  # Builds and pushes a Docker image for the ojp-server if relevant files are modified.
+  build-docker-image:
+    name: Build Docker Image
+    needs: build-test-server
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && (
+        contains(github.event.head_commit.modified, 'ojp-server/') ||
+        contains(github.event.head_commit.modified, 'ojp-grpc-commons/')
+      )
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 22
+        uses: actions/setup-java@v4
+        with:
+          java-version: 22
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build and push Docker image
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKERHUB_REPO: ${{ vars.DOCKERHUB_REPO }}
+        run: |
+          mvn compile jib:build -pl ojp-server -Dimage="${DOCKERHUB_REPO}:latest" \
+            -Djib.to.auth.username="${DOCKERHUB_USER}" \
+            -Djib.to.auth.password="${DOCKERHUB_TOKEN}"
